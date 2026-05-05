@@ -1,8 +1,9 @@
 {
   "name": "music mayhem",
   "short_name": "music mayhem",
-  "start_url": "index.html",
+  "start_url": "./index.html",
   "display": "fullscreen",
+  "orientation": "portrait",
   "background_color": "#ffbc5e",
   "theme_color": "#ffe772",
   "icon": [
