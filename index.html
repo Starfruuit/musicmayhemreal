@@ -1,0 +1,1686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Music Mayhem</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        :root {
+            --ff-blue-top: #0000a0;
+            --ff-blue-bot: #000030;
+            --ff-border: #ffffff;
+            --ff-bg: linear-gradient(to bottom, var(--ff-blue-top), var(--ff-blue-bot));
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #050505;
+            color: white;
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            box-shadow: 0 0 20px rgba(0, 255, 150, 0.2);
+            background-color: #000;
+            overflow: hidden;
+            transform-origin: top center;
+        }
+
+        @media (max-width: 900px) {
+            #game-container {
+                transform: scale(0.9);
+            }
+        }
+
+        @media (max-width: 800px) {
+            #game-container {
+                transform: scale(0.8);
+            }
+        }
+
+        @media (max-width: 700px) {
+            #game-container {
+                transform: scale(0.7);
+            }
+        }
+
+        @media (max-width: 600px) {
+            #game-container {
+                transform: scale(0.6);
+            }
+        }
+
+        @media (max-width: 500px) {
+            #game-container {
+                transform: scale(0.5);
+            }
+        }
+
+        @media (max-width: 450px) {
+            #game-container {
+                transform: scale(0.45);
+            }
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        /* Battle UI Overlay */
+        #battle-scene {
+            display: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url(images/background_battle_MM.png);
+            background-position: 75% bottom;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .battle-arena {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            padding: 40px;
+            position: relative;
+            overflow-y: auto;
+        }
+
+        .enemies-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            width: 40%;
+        }
+
+        .party-side {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: flex-end;
+            width: 40%;
+        }
+
+        .sprite {
+            font-size: 40px;
+            text-align: center;
+            animation: bounce 2s infinite ease-in-out alternate;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            cursor: pointer;
+        }
+
+        .party-sprite {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 12px;
+            animation-delay: 0.5s;
+            cursor: pointer;
+        }
+
+        .party-sprite span.emoji {
+            font-size: 40px;
+        }
+
+        /* --- ANIMATIONS --- */
+        .anim-attack {
+            animation: lunge 0.3s ease-in-out;
+        }
+        @keyframes lunge {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(-30px); }
+            100% { transform: translateX(0); }
+        }
+        .anim-attack-enemy {
+            animation: lunge-enemy 0.3s ease-in-out;
+        }
+        @keyframes lunge-enemy {
+            0% { transform: translateX(0); }
+            50% { transform: translateX(30px); }
+            100% { transform: translateX(0); }
+        }
+        .anim-damage {
+            animation: shake 0.3s ease-in-out;
+            filter: drop-shadow(0 0 10px red);
+            color: red;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .anim-heal {
+            animation: healGlow 0.5s ease-in-out;
+            filter: drop-shadow(0 0 15px #a8ffb2);
+            color: #a8ffb2;
+        }
+        @keyframes healGlow {
+            0%, 100% { filter: drop-shadow(0 0 0px transparent); }
+            50% { filter: drop-shadow(0 0 20px #a8ffb2); transform: translateY(-5px); }
+        }
+        .anim-debuff {
+            animation: debuffGlow 0.5s ease-in-out;
+            filter: drop-shadow(0 0 15px #a8d5ff);
+            color: #a8d5ff;
+        }
+        @keyframes debuffGlow {
+            0%, 100% { filter: drop-shadow(0 0 0px transparent); }
+            50% { filter: drop-shadow(0 0 20px #a8d5ff); transform: translateY(5px); }
+        }
+        .active-turn {
+            filter: drop-shadow(0 0 15px yellow);
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+
+        /* Final Fantasy Classic Menus */
+        .ff-box {
+            background: var(--ff-bg);
+            border: 4px solid var(--ff-border);
+            border-radius: 6px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 2px 2px 5px rgba(0,0,0,0.5);
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .battle-hud {
+            height: 200px;
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: #000;
+        }
+
+        .log-box {
+            flex: 2;
+            font-size: 12px;
+            line-height: 1.8;
+            overflow-y: auto;
+        }
+
+        .command-box {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .command-box button {
+            background: none;
+            border: none;
+            color: white;
+            font-family: inherit;
+            text-align: left;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 0;
+            position: relative;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .command-box button:hover::before {
+            content: '▶';
+            position: absolute;
+            left: -20px;
+            color: white;
+            animation: blink 0.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .status-box {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 5px 0;
+            border-bottom: 2px solid rgba(255,255,255,0.2);
+        }
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-name { width: 140px; }
+        .status-hp { width: 100px; color: #a8ffb2; }
+        .status-mp { width: 100px; color: #a8d5ff; }
+
+        /* Screen Flash Effect */
+        #flash-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.1s;
+            z-index: 100;
+        }
+
+        .flash-anim {
+            animation: encounterFlash 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes encounterFlash {
+            0% { opacity: 0; }
+            10% { opacity: 1; }
+            20% { opacity: 0; }
+            30% { opacity: 1; }
+            40% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .controls-hint {
+            margin-top: 20px;
+            font-size: 10px;
+            color: #888;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+
+
+        /* --- MENU SYSTEM --- */
+        #menu-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: var(--ff-bg);
+            border: 2px solid var(--ff-border);
+            color: white;
+            font-family: inherit;
+            padding: 10px;
+            cursor: pointer;
+            z-index: 10;
+            border-radius: 4px;
+        }
+        #menu-btn:hover { background: #0000a0; }
+
+        #main-menu {
+            display: none;
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 50;
+            padding: 40px;
+            box-sizing: border-box;
+            flex-direction: column;
+        }
+
+        .menu-layout {
+            display: flex;
+            gap: 4%;
+            height: 100%;
+        }
+
+        .menu-sidebar {
+            flex: 0 0 25%;
+            min-width: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 1vh;
+        }
+
+        .menu-sidebar button {
+            background: transparent;
+            border: none;
+            color: white;
+            font-family: inherit;
+            text-align: left;
+            font-size: clamp(10px, 1.5vw, 14px);
+            cursor: pointer;
+            padding: 4%;
+            word-wrap: break-word;
+        }
+        .menu-sidebar button:hover, .menu-sidebar button.active-tab {
+            color: yellow;
+        }
+
+        .menu-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .equip-btn {
+            background: transparent; border: 1px solid #555; color: white;
+            font-family: inherit; padding: 2%; cursor: pointer; margin: 1% 0; width: 100%; text-align: left;
+            font-size: clamp(8px, 1.2vw, 10px); line-height: 1.4;
+            overflow: hidden; text-overflow: ellipsis; word-wrap: break-word;
+        }
+        .equip-btn:hover { border-color: white; }
+
+        /* --- NEW RESPONSIVE MENU UTILITIES --- */
+        .menu-title { margin-top:0; font-size: clamp(14px, 2vw, 20px); border-bottom: 2px solid white; padding-bottom: 10px; }
+        .menu-item { background:rgba(255,255,255,0.05); padding:2%; border-radius:4px; margin-bottom:2%; word-wrap: break-word; }
+        .menu-text { font-size: clamp(10px, 1.5vw, 12px); word-wrap: break-word; }
+        .menu-subtext { font-size: clamp(8px, 1.2vw, 10px); color:#aaa; line-height:1.4; }
+        .equip-layout { display: flex; gap: 4%; width: 100%; }
+        .equip-col { flex: 1; min-width: 0; }
+        .equip-col-right { flex: 1; border-left: 2px solid #555; padding-left: 4%; min-width: 0; }
+
+
+
+        /* --- AUDIO METER SYSTEM --- */
+        #mic-btn {
+            position: absolute;
+            top: 20px;
+            right: 120px;
+            background: var(--ff-bg);
+            border: 2px solid var(--ff-border);
+            color: white;
+            font-family: inherit;
+            padding: 10px;
+            cursor: pointer;
+            z-index: 10;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        #mic-btn:hover { background: #0000a0; }
+        #mic-btn.listening {
+            background: #006600;
+            border-color: #00ff00;
+        }
+        .meter-container {
+            text-align: center;
+            padding: 10px;
+        }
+        .volume-bar-bg {
+            width: 100%;
+            background: #222;
+            height: 20px;
+            border: 1px solid #fff;
+            margin-top: 10px;
+        }
+        #volume-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            transition: width 0.1s;
+        }
+        .flex {
+            display: flex;
+        }
+
+        /* --- MOBILE CONTROLS --- */
+        #mobile-dpad {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 120px;
+            height: 120px;
+            z-index: 40;
+        }
+
+        .dpad-button {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 0, 160, 0.7);
+            border: 2px solid #ffffff;
+            color: white;
+            font-size: 20px;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .dpad-button:active {
+            background: rgba(0, 0, 200, 0.9);
+            box-shadow: 0 0 10px rgba(0, 255, 150, 0.5);
+        }
+
+        #dpad-up { top: 0; left: 40px; }
+        #dpad-down { bottom: 0; left: 40px; }
+        #dpad-left { top: 40px; left: 0; }
+        #dpad-right { top: 40px; right: 0; }
+
+        @media (max-width: 768px) {
+            #mobile-dpad {
+                display: block;
+            }
+        }
+
+
+    </style>
+</head>
+<body>
+    <script>
+    if (navigator && navigator.serviceWorker) {
+        navigator.serviceWorker.register('sw.js');
+    }
+
+    // PWA Install Prompt
+    let deferredPrompt;
+    const installButton = document.createElement('button');
+    installButton.id = 'install-btn';
+    installButton.textContent = 'Install Music Mayhem';
+    installButton.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: #ffbc5e;
+        color: #000;
+        border: 2px solid #ffe772;
+        padding: 10px 15px;
+        font-family: 'Press Start 2P', monospace;
+        font-size: 12px;
+        cursor: pointer;
+        z-index: 1000;
+        display: none;
+        box-shadow: 0 0 10px rgba(255, 188, 94, 0.5);
+    `;
+
+    // Add install button to body
+    document.body.appendChild(installButton);
+
+    // Listen for the beforeinstallprompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        // Show the install button
+        installButton.style.display = 'block';
+    });
+
+    // Handle the install button click
+    installButton.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+
+        // Show the install prompt
+        deferredPrompt.prompt();
+
+        // Wait for the user to respond to the prompt
+        const { outcome } = await deferredPrompt.userChoice;
+
+        // Hide the install button
+        installButton.style.display = 'none';
+
+        // Clear the deferred prompt
+        deferredPrompt = null;
+    });
+
+    // Hide the install button if the app is already installed
+    window.addEventListener('appinstalled', () => {
+        installButton.style.display = 'none';
+        deferredPrompt = null;
+    });
+    </script>
+<div id="flex">
+    <div id="game-container">
+        <!-- TOP BUTTONS -->
+        <button id="mic-btn" onclick="toggleAudio()">Enable Mic</button>
+        <button id="menu-btn" onclick="toggleMenu()">Menu</button>
+        
+        <div id="main-menu" class="ff-box" style="padding: 4%;">
+            <h2 class="menu-title">Party Menu</h2>
+            <div class="menu-layout">
+                <div class="menu-sidebar">
+                    <button onclick="switchMenuTab('inventory')" id="tab-inventory">Inventory</button>
+                    <button onclick="switchMenuTab('party')" id="tab-party">Party</button>
+                    <button onclick="switchMenuTab('equipment')" id="tab-equipment">Equipment</button>
+                    <button onclick="toggleMenu()" style="margin-top: auto; color: #ff5555;">Resume Game</button>
+                </div>
+                <div class="menu-content" id="menu-content-area">
+                    <!-- Dynamic Menu Content Injected Here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- MAP SCENE -->
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+
+        <!-- BATTLE SCENE -->
+        <div id="battle-scene">
+            <div class="battle-arena">
+                <div class="enemies-side" id="enemies-container">
+                    <!-- Enemies injected here -->
+                </div>
+                <div class="party-side" id="party-container">
+                    <!-- Party sprites injected here -->
+                </div>
+            </div>
+            
+            <div class="battle-hud">
+                <div class="ff-box log-box" id="battle-log">
+                    The forest is quiet...
+                </div>
+                <div class="ff-box command-box">
+                    <div id="turn-indicator" style="color: yellow; font-size: 10px; margin-bottom: 5px;"></div>
+                    <div id="command-list" style="display:flex; flex-direction:column; gap:15px;">
+                        <!-- Commands injected here -->
+                    </div>
+                </div>
+                <div class="ff-box status-box" id="status-container">
+                    <!-- Status rows injected here -->
+                </div>
+            </div>
+        </div>
+
+        <div id="flash-overlay"></div>
+
+        <!-- MOBILE D-PAD CONTROLS -->
+        <div id="mobile-dpad">
+            <button id="dpad-up" class="dpad-button" onclick="movePlayer(0, -1)">▲</button>
+            <button id="dpad-down" class="dpad-button" onclick="movePlayer(0, 1)">▼</button>
+            <button id="dpad-left" class="dpad-button" onclick="movePlayer(-1, 0)">◄</button>
+            <button id="dpad-right" class="dpad-button" onclick="movePlayer(1, 0)">►</button>
+        </div>
+    </div>
+
+    <div class="controls-hint">
+        Use <b>W, A, S, D</b> or <b>Arrow Keys</b> to explore the Magic Forest.<br>
+        Every step has a chance to trigger a musical encounter!
+    </div>
+
+    <!-- Audio Elements -->
+    <audio id="overworld-music" loop>
+        <source src="songs/overworld_MM.wav" type="audio/wav">
+    </audio>
+    <audio id="battle-music" loop>
+        <source src="songs/small battle.wav" type="audio/wav">
+    </audio>
+    <audio id="boss-music" loop>
+        <source src="songs/boss battle.wav" type="audio/wav">
+    </audio>
+
+    <script>
+        // --- GAME DATA & STATE ---
+        const partyBase = [
+            { id: 'fighter', name: 'forte', role: ' ', level: 1, baseHp: 450, baseMp: 30, baseAtk: 80, baseDef: 30, baseMag: 10, baseSpd: 35, growth: { hp: 50, mp: 0, atk: 11, def: 5, mag: 1, spd: 2 }, icon: '🎹', sprite: '<img src="images/Forte_MM.png" height=40% width=40%>', spells: [{ name: "Crescendo", cost: 0, type: 'damage', power: 1.2 },{ name: "Strong as a Piano", cost: 30, type: 'buff_team_def', power: 1.5 }] },
+            { id: 'mage', name: 'miles', role: ' ', level: 1, baseHp: 220, baseMp: 80, baseAtk: 30, baseDef: 15, baseMag: 60, baseSpd: 45, growth: { hp: 20, mp: 30, atk: 1, def: 2, mag: 8, spd: 4 }, icon: '🎷', sprite: '<img src="images/Miles_MM.png" height=40% width=40%>', spells: [{name: 'Bebop Blast', cost: 40, type: 'damage', power: 2.0}, {name: 'Symphony Strike', cost: 60, type: 'damage_all', power: 1.8}] },
+            { id: 'healer', name: 'clara', role: ' ', level: 1, baseHp: 280, baseMp: 100, baseAtk: 40, baseDef: 20, baseMag: 45, baseSpd: 40, growth: { hp: 25, mp: 40, atk: 2, def: 3, mag: 6, spd: 3 }, icon: '✨', sprite: '<img src="images/Clara_MM.png" height=40% width=40%>', spells: [{name: 'Sonata Strike', cost: 50, type: 'damage', power: 1.5}, {name: 'Healing Melody', cost: 25, type: 'heal', power: 2.5}, {name: 'Restring', cost: 90, type: 'revive', power: 1.8}] },
+            { id: 'ninja', name: 'tyler', role: ' ', level: 1, baseHp: 310, baseMp: 40, baseAtk: 60, baseDef: 25, baseMag: 25, baseSpd: 65, growth: { hp: 30, mp: 5, atk: 6, def: 3, mag: 2, spd: 8 }, icon: '🎤', sprite: '<img src="images/Tyler_MM.png" height=40% width=40%>', spells: [{name: 'Slow Flow', cost: 20, type: 'debuff_spd', power: 1.0}, { name: "Wavedash", cost: 40, type: 'buff_spd_restore_mp', power: 1.5}] }
+        ];
+
+        let party = [];
+        
+        function initializeParty() {
+            party = partyBase.map(char => {
+                let lvl = char.level - 1;
+                return {
+                    ...char,
+                    isPlayer: true,
+                    hp: char.baseHp + (char.growth.hp * lvl),
+                    maxHp: char.baseHp + (char.growth.hp * lvl),
+                    mp: char.baseMp + (char.growth.mp * lvl),
+                    maxMp: char.baseMp + (char.growth.mp * lvl),
+                    atk: char.baseAtk + (char.growth.atk * lvl),
+                    def: char.baseDef + (char.growth.def * lvl),
+                    mag: char.baseMag + (char.growth.mag * lvl),
+                    spd: char.baseSpd + (char.growth.spd * lvl),
+                    equipment: { weapon: null, armor: null },
+                    isDefending: false,
+                    domId: `party-${char.id}`
+                };
+            });
+        }
+        
+        function getStat(char, stat) {
+            if (!char.isPlayer) return char[stat];
+            let val = char[stat];
+            if (char.equipment && char.equipment.weapon && char.equipment.weapon[stat]) val += char.equipment.weapon[stat];
+            if (char.equipment && char.equipment.armor && char.equipment.armor[stat]) val += char.equipment.armor[stat];
+            return val;
+        }
+        
+        initializeParty();
+
+        // --- MUSIC SYSTEM ---
+        let currentBattleType = null; // Track if it's a boss battle
+        
+        function playMusic(trackName) {
+            const overworldAudio = document.getElementById('overworld-music');
+            const battleAudio = document.getElementById('battle-music');
+            const bossAudio = document.getElementById('boss-music');
+            
+            // Stop all music
+            overworldAudio.pause();
+            battleAudio.pause();
+            bossAudio.pause();
+            
+            // Reset to beginning
+            overworldAudio.currentTime = 0;
+            battleAudio.currentTime = 0;
+            bossAudio.currentTime = 0;
+            
+            // Play requested track
+            if (trackName === 'overworld') {
+                overworldAudio.play().catch(e => console.log('Autoplay prevented:', e));
+            } else if (trackName === 'battle') {
+                battleAudio.play().catch(e => console.log('Autoplay prevented:', e));
+            } else if (trackName === 'boss') {
+                bossAudio.play().catch(e => console.log('Autoplay prevented:', e));
+            }
+        }
+        
+        function stopAllMusic() {
+            document.getElementById('overworld-music').pause();
+            document.getElementById('battle-music').pause();
+            document.getElementById('boss-music').pause();
+        }
+
+        const enemiesList = [
+            { name: "Discordant Slime", icon: '<img src="images/slime.png">', hp: 150, atk: 20, def: 10, mag: 5, spd: 25, maxMp: 30, mp: 30 },
+            { name: "Scared T-Rex", icon: '<img src="images/scaredtrex.jpg">', hp: 1000, atk: 100, def: 40, mag: 30, spd: 15, isBoss: true, maxMp: 60, mp: 60 },
+            { name: "Feedback Bat", icon: '<img src="images/bat.png">', hp: 100, atk: 25, def: 10, mag: 20, spd: 55, maxMp: 40, mp: 40 },
+            { name: "Arpeggio Assassin", icon: '<img src="images/spider.png">', hp: 180, atk: 40, def: 15, mag: 15, spd: 60, maxMp: 50, mp: 50 }
+        ];
+
+        const state = {
+            scene: 'map',
+            player: { x: 10, y: 7 },
+            gridSize: 40,
+            cols: 20,
+            rows: 15,
+            steps: 0,
+            stepsSinceLastEncounter: 0,
+            partyLeaderIndex: 0,
+            trees: [],
+            inventory: [
+                { id: 'pot_hp', name: 'Health Potion', type: 'consumable', desc: 'Restores 100 HP.', count: 5 },
+                { id: 'wep_piano', name: 'Grand Keyboard', type: 'weapon', atk: 15, def: 0, mag: 5, spd: -5, count: 1 },
+                { id: 'arm_tux', name: 'Silk Tuxedo', type: 'armor', atk: 0, def: 10, mag: 10, spd: 5, count: 1 },
+                { id: 'wep_mic', name: 'Golden Mic', type: 'weapon', atk: 20, def: 0, mag: 0, spd: 10, count: 1 }
+            ],
+            menu: {
+                activeTab: 'inventory',
+                equipCharIndex: 0
+            },
+            battle: {
+                combatants: [],
+                turnIndex: 0,
+                waiting: false,
+                pendingAction: null
+            }
+        };
+
+        // --- WEB AUDIO API (VOLUME METER) ---
+        let audioCtx, analyser, microphone;
+        let micEnabled = false;
+        let maxRecordedDb = 0;
+        let powerMultiplier = 1;
+        let meterActive = false;
+
+        async function toggleAudio() {
+            if (micEnabled) return; // Only need to enable it once
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+                microphone = audioCtx.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                
+                micEnabled = true;
+                const btn = document.getElementById('mic-btn');
+                btn.innerHTML = "🎤 Mic Enabled";
+                btn.classList.add('listening');
+            } catch (err) {
+                console.error("Microphone access error:", err);
+                alert("Microphone access was blocked! \n\nRemember to use a site like CodePen (HTTPS) to test microphone features, as local files are often blocked by the browser for security.");
+            }
+        }
+
+        function startVolumeMeter(callback) {
+            const list = document.getElementById('command-list');
+            list.innerHTML = `
+                <div class="meter-container">
+                    <h3 style="color:yellow; margin: 0 0 5px 0;">MAKE SOME NOISE!</h3>
+                    <div id="volume-text" style="font-size:16px; font-weight:bold;">0 dB (Max: 0)</div>
+                    <div class="volume-bar-bg">
+                        <div id="volume-bar"></div>
+                    </div>
+                </div>
+            `;
+            
+            maxRecordedDb = 0;
+            meterActive = true;
+            let timeLeft = 2.5; // 2.5 seconds to yell
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            function pollVolume() {
+                if (!meterActive) return;
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Calculate average volume from frequency data
+                let sum = 0;
+                for(let i = 0; i < dataArray.length; i++) { 
+                    sum += dataArray[i]; 
+                }
+                let average = sum / dataArray.length;
+                
+                // Map the raw byte data (0-255) to a fun 0-120 "Decibel" scale
+                let currentDb = Math.floor((average / 120) * 120); 
+                if (currentDb > 120) currentDb = 120;
+                if (currentDb > maxRecordedDb) maxRecordedDb = currentDb;
+                
+                document.getElementById('volume-text').innerText = `${currentDb} dB (Max: ${maxRecordedDb} dB)`;
+                document.getElementById('volume-bar').style.width = `${(currentDb / 120) * 100}%`;
+                
+                requestAnimationFrame(pollVolume);
+            }
+            
+            pollVolume();
+            
+            // Timer to stop metering and execute the action
+            let countdown = setInterval(() => {
+                timeLeft -= 0.1;
+                if (timeLeft <= 0) {
+                    clearInterval(countdown);
+                    meterActive = false;
+                    
+                    // Base power is 1. Add 0.5% (0.005) for every decibel.
+                    powerMultiplier = 1 + (maxRecordedDb * 0.005);
+                    callback();
+                }
+            }, 100);
+        }
+
+        // --- MAP SYSTEM ---
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const backgroundImg = new Image();
+        backgroundImg.src = 'images/background_MM.png';
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            const containerWidth = container.clientWidth;
+            const containerHeight = container.clientHeight;
+            
+            // Maintain 4:3 aspect ratio
+            let width = containerWidth;
+            let height = (containerWidth * 3) / 4;
+            
+            if (height > containerHeight) {
+                height = containerHeight;
+                width = (containerHeight * 4) / 3;
+            }
+            
+            canvas.width = Math.floor(width);
+            canvas.height = Math.floor(height);
+            
+            // Update grid size based on canvas dimensions
+            // Keep roughly the same grid granularity (aiming for ~40px per tile at default size)
+            const scale = Math.min(width / 800, height / 600);
+            state.gridSize = Math.max(20, Math.floor(40 * scale));
+            
+            // Redraw the map with new dimensions
+            if (state.scene === 'map') {
+                drawMap();
+            }
+        }
+
+        function initMap() {
+            drawMap();
+        }
+
+        function drawMap() {
+            // Draw background image
+            if (backgroundImg.complete) {
+                ctx.drawImage(backgroundImg, 0, 0, canvas.width, canvas.height);
+            } else {
+                ctx.fillStyle = '#051014';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+
+            // Draw player character
+            let px = state.player.x * state.gridSize + (state.gridSize/2);
+            let py = state.player.y * state.gridSize + (state.gridSize/2);
+            
+            let leader = party[state.partyLeaderIndex];
+
+            ctx.font = '28px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(leader ? leader.icon : '🎵', px, py);
+            ctx.shadowBlur = 0;
+        }
+
+        function movePlayer(dx, dy) {
+            if (state.scene !== 'map') return;
+
+            let newX = state.player.x + dx;
+            let newY = state.player.y + dy;
+
+            if (newX >= 0 && newX < state.cols && newY >= 0 && newY < state.rows) {
+                state.player.x = newX;
+                state.player.y = newY;
+                state.steps++;
+                drawMap();
+
+                state.stepsSinceLastEncounter++;
+                if (state.stepsSinceLastEncounter > 5 && Math.random() < 0.10) {
+                    state.stepsSinceLastEncounter = 0;
+                    triggerEncounter();
+                }
+            }
+        }
+
+        // --- MENU SYSTEM ---
+        function toggleMenu() {
+            if (state.scene === 'battle') return; 
+            
+            if (state.scene === 'map') {
+                state.scene = 'menu';
+                document.getElementById('main-menu').style.display = 'flex';
+                document.getElementById('menu-btn').style.display = 'none';
+                switchMenuTab('inventory');
+            } else if (state.scene === 'menu') {
+                state.scene = 'map';
+                document.getElementById('main-menu').style.display = 'none';
+                document.getElementById('menu-btn').style.display = 'block';
+                resizeCanvas();
+                drawMap();
+            }
+        }
+
+        function switchMenuTab(tab) {
+            state.menu.activeTab = tab;
+            document.querySelectorAll('.menu-sidebar button').forEach(b => b.classList.remove('active-tab'));
+            document.getElementById(`tab-${tab}`).classList.add('active-tab');
+            
+            let area = document.getElementById('menu-content-area');
+            area.innerHTML = ''; 
+            
+            if (tab === 'inventory') {
+                area.innerHTML = `<h3 class="menu-title" style="border:none;">Inventory</h3><ul style="list-style-type:none; padding:0; margin:0;">` + 
+                    state.inventory.map(i => `<li class="menu-item"><b class="menu-text">${i.name}</b> <span class="menu-text">(x${i.count})</span><br><span class="menu-subtext">${i.desc || 'Equipment'}</span></li>`).join('') +
+                    `</ul>`;
+                    
+            } else if (tab === 'party') {
+                area.innerHTML = `<h3 class="menu-title" style="border:none;">Set Party Leader</h3><div style="display:flex; flex-direction:column; gap:1vh;">` +
+                    party.map((p, i) => `
+                        <div class="menu-item" style="display:flex; align-items:center; gap:2%;">
+                            <span style="font-size:clamp(20px, 4vw, 30px);">${p.sprite}</span>
+                            <div class="menu-text" style="flex: 1; min-width: 0;">${p.name}</div>
+                            ${state.partyLeaderIndex === i ? 
+                                `<span class="menu-text" style="color:yellow;">★ Leader</span>` : 
+                                `<button class="menu-text" onclick="setLeader(${i})" style="padding:2%; font-family:inherit; cursor:pointer; background:transparent; color:white; border:1px solid white; word-wrap:break-word;">Make Leader</button>`}
+                        </div>
+                    `).join('') + `</div>`;
+                    
+            } else if (tab === 'equipment') {
+                renderEquipScreen(area);
+            }
+        }
+
+        function setLeader(index) {
+            state.partyLeaderIndex = index;
+            drawMap();
+            switchMenuTab('party'); 
+        }
+
+        function renderEquipScreen(area) {
+            let char = party[state.menu.equipCharIndex];
+            let equipItems = state.inventory.filter(i => i.type === 'weapon' || i.type === 'armor');
+
+            area.innerHTML = `
+                <div style="display: flex; gap: 2%; margin-bottom: 2vh; flex-wrap: wrap;">
+                    ${party.map((p, i) => `<button class="menu-text" onclick="state.menu.equipCharIndex=${i}; switchMenuTab('equipment')" style="font-family:inherit; flex: 1; min-width: 20%; background:none; border:1px solid ${i===state.menu.equipCharIndex?'yellow':'#555'}; color:${i===state.menu.equipCharIndex?'yellow':'white'}; padding:2%; cursor:pointer;">${p.name}</button>`).join('')}
+                </div>
+                <div class="equip-layout">
+                    <div class="equip-col">
+                        <h4 class="menu-text" style="margin-top:0; color:#a8d5ff;">${char.name}'s Stats</h4>
+                        <div class="menu-text" id="equip-stats-preview" style="line-height:1.8; background:rgba(0,0,0,0.5); padding:4%; border-radius:4px;">
+                            <div>ATK: ${getStat(char, 'atk')}</div>
+                            <div>DEF: ${getStat(char, 'def')}</div>
+                            <div>MAG: ${getStat(char, 'mag')}</div>
+                            <div>SPD: ${getStat(char, 'spd')}</div>
+                        </div>
+                        <h4 class="menu-text" style="color:#a8d5ff; margin-top:2vh;">Currently Equipped</h4>
+                        <button class="equip-btn" onclick="unequipItem(${state.menu.equipCharIndex}, 'weapon')">
+                            Weapon: ${char.equipment.weapon ? char.equipment.weapon.name : 'None'}
+                        </button>
+                        <button class="equip-btn" onclick="unequipItem(${state.menu.equipCharIndex}, 'armor')">
+                            Armor: ${char.equipment.armor ? char.equipment.armor.name : 'None'}
+                        </button>
+                    </div>
+                    <div class="equip-col-right">
+                        <h4 class="menu-text" style="margin-top:0; color:#a8d5ff;">Available Equipment</h4>
+                        ${equipItems.length === 0 ? '<div class="menu-text" style="color:#888;">No equipment in inventory.</div>' : ''}
+                        <div style="display:flex; flex-direction:column; gap:1vh; padding-right: 5px;">
+                            ${equipItems.map(i => `
+                                <button class="equip-btn" 
+                                    onclick="equipItem(${state.menu.equipCharIndex}, '${i.id}')"
+                                    onmouseover="previewStats(${state.menu.equipCharIndex}, '${i.id}')"
+                                    onmouseout="resetPreview(${state.menu.equipCharIndex})">
+                                    <span style="color:yellow">${i.name}</span> (x${i.count})<br>
+                                    <span style="color:#aaa;">Slot: ${i.type.toUpperCase()}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function previewStats(charIndex, itemId) {
+            let char = party[charIndex];
+            let item = state.inventory.find(i => i.id === itemId);
+            if(!item) return;
+
+            let slot = item.type;
+            let currentEq = char.equipment[slot];
+            
+            let stats = ['atk', 'def', 'mag', 'spd'];
+            let html = '';
+            stats.forEach(s => {
+                let currentVal = getStat(char, s);
+                let itemVal = item[s] || 0;
+                let oldVal = currentEq ? (currentEq[s] || 0) : 0;
+                let newVal = currentVal - oldVal + itemVal;
+                
+                let color = newVal > currentVal ? '#a8ffb2' : (newVal < currentVal ? '#ff5555' : 'white');
+                html += `<div>${s.toUpperCase()}: ${currentVal} -> <span style="color:${color}">${newVal}</span></div>`;
+            });
+            document.getElementById('equip-stats-preview').innerHTML = html;
+        }
+
+        function resetPreview(charIndex) {
+            let char = party[charIndex];
+            document.getElementById('equip-stats-preview').innerHTML = `
+                <div>ATK: ${getStat(char, 'atk')}</div>
+                <div>DEF: ${getStat(char, 'def')}</div>
+                <div>MAG: ${getStat(char, 'mag')}</div>
+                <div>SPD: ${getStat(char, 'spd')}</div>
+            `;
+        }
+
+        function equipItem(charIndex, itemId) {
+            let char = party[charIndex];
+            let invIndex = state.inventory.findIndex(i => i.id === itemId);
+            if(invIndex === -1) return;
+            let item = state.inventory[invIndex];
+            let slot = item.type;
+
+            unequipItem(charIndex, slot);
+            char.equipment[slot] = {...item}; 
+            
+            state.inventory[invIndex].count--; 
+            if(state.inventory[invIndex].count <= 0) state.inventory.splice(invIndex, 1);
+
+            switchMenuTab('equipment');
+        }
+
+        function unequipItem(charIndex, slot) {
+            let char = party[charIndex];
+            let item = char.equipment[slot];
+            if(!item) return;
+
+            let invItem = state.inventory.find(i => i.id === item.id);
+            if(invItem) invItem.count++;
+            else state.inventory.push({...item, count: 1});
+
+            char.equipment[slot] = null;
+            if(state.scene === 'menu') switchMenuTab('equipment'); 
+        }
+
+        // --- ENCOUNTER & BATTLE SYSTEM ---
+        function triggerEncounter() {
+            state.scene = 'battle';
+            document.getElementById('mobile-dpad').style.display = 'none';
+            
+            const overlay = document.getElementById('flash-overlay');
+            overlay.classList.add('flash-anim');
+            
+            setTimeout(() => {
+                document.getElementById('game-canvas').style.display = 'none';
+                document.getElementById('battle-scene').style.display = 'flex';
+                initBattle();
+            }, 400);
+
+            setTimeout(() => {
+                overlay.classList.remove('flash-anim');
+            }, 800);
+        }
+
+        function initBattle() {
+            const enemiesContainer = document.getElementById('enemies-container');
+            enemiesContainer.innerHTML = '';
+
+            let currentEnemy = enemiesList[Math.floor(Math.random() * enemiesList.length)];
+            const isBossFight = currentEnemy.isBoss;
+            if (currentEnemy.isBoss) {
+                currentEnemy = enemiesList[Math.floor(Math.random() * enemiesList.length)];
+                isBossFight = currentEnemy.isBoss;
+            }
+            if (currentEnemy.isBoss) {
+                currentEnemy = enemiesList[Math.floor(Math.random() * enemiesList.length)];
+                isBossFight = currentEnemy.isBoss;
+            }
+            const enemyCount = isBossFight ? 1 : Math.floor(Math.random() * 3) + 1;
+            
+            // Play appropriate music
+            if (isBossFight) {
+                playMusic('boss');
+            } else {
+                playMusic('battle');
+            }
+            
+            let battleEnemies = [];
+            for(let i=0; i<enemyCount; i++) {
+                let e = { ...currentEnemy, isPlayer: false, domId: `enemy-${i}`, isDefending: false, maxHp: currentEnemy.hp };
+                battleEnemies.push(e);
+                
+                const el = document.createElement('div');
+                el.className = 'sprite';
+                el.id = e.domId;
+                el.innerHTML = e.icon;
+                el.style.animationDelay = `${i * 0.2}s`;
+                enemiesContainer.appendChild(el);
+            }
+
+            party.forEach(p => p.isDefending = false);
+
+            state.battle.combatants = [...party, ...battleEnemies];
+            state.battle.combatants.sort((a, b) => getStat(b, 'spd') - getStat(a, 'spd'));
+            state.battle.turnIndex = 0;
+            state.battle.waiting = false;
+
+            renderPartySprites();
+            renderPartyStatus();
+
+            const log = document.getElementById('battle-log');
+            if (isBossFight) {
+                log.innerHTML = `<span style="color:#ff8800; font-weight: bold;">⚠ BOSS ENCOUNTER! ⚠</span><br><span style="color:#ff5555">${currentEnemy.name}</span> appeared!`;
+            } else {
+                log.innerHTML = `Warning! <span style="color:#ff5555">${enemyCount}x ${currentEnemy.name}</span> appeared!`;
+            }
+            document.getElementById('turn-indicator').innerText = "Calculating Turns...";
+
+            setTimeout(nextTurn, 1500);
+        }
+
+        function nextTurn() {
+            if (state.scene !== 'battle') return;
+
+            let playersAlive = state.battle.combatants.filter(c => c.isPlayer && c.hp > 0).length;
+            let enemiesAlive = state.battle.combatants.filter(c => !c.isPlayer && c.hp > 0).length;
+            
+            if (playersAlive === 0) {
+                document.getElementById('battle-log').innerHTML += `<br>The party has fallen... Game Over.`;
+                document.getElementById('turn-indicator').innerText = "Defeat";
+                return;
+            }
+            if (enemiesAlive === 0) {
+                document.getElementById('battle-log').innerHTML += `<br>Victory! Enemies defeated!`;
+                document.getElementById('turn-indicator').innerText = "Victory";
+                setTimeout(() => fleeBattle(true), 2500);
+                return;
+            }
+
+            if (state.battle.turnIndex >= state.battle.combatants.length) {
+                state.battle.turnIndex = 0;
+                // Re-sort at the start of each new round to account for speed changes
+                state.battle.combatants.sort((a, b) => getStat(b, 'spd') - getStat(a, 'spd'));
+            }
+
+            let current = state.battle.combatants[state.battle.turnIndex];
+            
+            if (current.hp <= 0) {
+                state.battle.turnIndex++;
+                nextTurn();
+                return;
+            }
+
+            current.isDefending = false; 
+            
+            document.querySelectorAll('.sprite, .party-sprite').forEach(el => el.classList.remove('active-turn'));
+            let activeEl = document.getElementById(current.domId);
+            if(activeEl) activeEl.classList.add('active-turn');
+
+            if (current.isPlayer) {
+                document.getElementById('turn-indicator').innerText = '';
+                state.battle.waiting = true;
+                renderCommandMenu();
+            } else {
+                document.getElementById('turn-indicator').innerText = '';
+                document.getElementById('command-list').innerHTML = '';
+                state.battle.waiting = false;
+                setTimeout(() => executeEnemyTurn(current), 1000);
+            }
+
+            renderPartyStatus();
+        }
+
+        function executeEnemyTurn(enemy) {
+            let players = state.battle.combatants.filter(c => c.isPlayer && c.hp > 0);
+            
+            if (enemy.name === "Scared T-Rex" && Math.random() < 0.2) {
+                playAnimation(enemy.domId, 'anim-attack-enemy');
+                
+                let logMsg = `<span style="color:#a8d5ff">${enemy.name} unleashes a magical wave!</span><br>`;
+                let totalDamage = 0;
+                
+                players.forEach(target => {
+                    let damage = Math.max(1, Math.floor(getStat(enemy, 'atk') * 1.3) - getStat(target, 'def'));
+                    target.hp -= damage;
+                    totalDamage += damage;
+                    
+                    playAnimation(target.domId, 'anim-damage');
+                    
+                    if(target.hp <= 0) {
+                        let playerEl = document.getElementById(target.domId);
+                        if(playerEl) playerEl.style.opacity = '0.3';
+                    }
+                });
+                
+                logMsg += `All party members take ${totalDamage} total damage!`;
+                document.getElementById('battle-log').innerHTML = logMsg;
+            } else {
+                // Normal attack
+                let target = players[Math.floor(Math.random() * players.length)];
+                
+                playAnimation(enemy.domId, 'anim-attack-enemy');
+                
+                let damage = Math.max(1, getStat(enemy, 'atk') - (target.isDefending ? getStat(target, 'def') * 2 : getStat(target, 'def')));
+                target.hp -= damage;
+                let mpRestore = Math.floor(enemy.maxMp / 6);
+                enemy.mp = Math.min(enemy.maxMp, enemy.mp + mpRestore);
+                
+                document.getElementById('battle-log').innerHTML = `${enemy.name} attacks ${target.name} for ${damage} DMG!`;
+                
+                playAnimation(target.domId, 'anim-damage');
+                renderPartyStatus();
+                
+                if(target.hp <= 0) {
+                    let playerEl = document.getElementById(target.domId);
+                    if(playerEl) playerEl.style.opacity = '0.3';
+                }
+            }
+            
+            renderPartyStatus();
+            state.battle.turnIndex++;
+            setTimeout(nextTurn, 1500);
+        }
+
+        function renderCommandMenu() {
+            if (!state.battle.waiting) return;
+            const list = document.getElementById('command-list');
+            list.innerHTML = `
+                <button onclick="showTargetMenu('enemy', {type: 'attack'})">Attack</button>
+                <button onclick="executeDefend()">Defend</button>
+                <button onclick="showMagicMenu()">Magic</button>
+                <button onclick="showItemMenu()">Item</button>
+                <button onclick="fleeBattle()">Run</button>
+            `;
+        }
+
+        function showMagicMenu() {
+            let current = state.battle.combatants[state.battle.turnIndex];
+            const list = document.getElementById('command-list');
+            let spells = current.spells;
+            let scrollStyle = spells.length >= 3 ? 'max-height: 150px; overflow-y: scroll;' : 'overflow-y: auto;';
+            let html = `<button onclick="renderCommandMenu()" style="color:#aaa; flex-shrink: 0; margin-bottom: 10px;">← Back</button>` +
+                `<div style="flex: 1; ${scrollStyle} display: flex; flex-direction: column; gap: 15px;">` +
+                spells.map((s, i) =>
+                    `<button onclick="selectSpell(${i})">${s.name} (${s.cost}MP)</button>`
+                ).join('') +
+                `</div>`;
+            list.innerHTML = html;
+        }
+
+        function selectSpell(index) {
+            let current = state.battle.combatants[state.battle.turnIndex];
+            let spell = current.spells[index];
+            if (current.mp < spell.cost) {
+                document.getElementById('battle-log').innerHTML = "Not enough MP!";
+                setTimeout(() => document.getElementById('battle-log').innerHTML = "Awaiting command...", 1000);
+                return;
+            }
+            if (spell.type === 'heal') {
+                showTargetMenu('player', {type: 'spell', index: index});
+            } else if (spell.type === 'buff_spd' || spell.type === 'buff_spd_restore_mp') {
+                showTargetMenu('player', {type: 'spell', index: index}, current.domId);
+            } else if (spell.type === 'revive') {
+                showTargetMenu('revive', {type: 'spell', index: index});
+            } else if (spell.type === 'buff_team_def' || spell.type === 'damage_all') {
+                state.battle.pendingAction = {type: 'spell', index: index};
+                powerMultiplier = 1;
+                maxRecordedDb = 0;
+                performActionLogic(null);
+            } else {
+                showTargetMenu('enemy', {type: 'spell', index: index});
+            }
+        }
+
+        function showItemMenu() {
+            let consumables = state.inventory.filter(i => i.type === 'consumable');
+            const list = document.getElementById('command-list');
+            if (consumables.length === 0) {
+                list.innerHTML = `<button onclick="renderCommandMenu()" style="color:#aaa; flex-shrink: 0; margin-bottom: 10px;">← Back</button><div style="font-size:10px; color:#888;">No items left!</div>`;
+                return;
+            }
+            let scrollStyle = consumables.length >= 3 ? 'max-height: 150px; overflow-y: scroll;' : 'overflow-y: auto;';
+            let html = `<button onclick="renderCommandMenu()" style="color:#aaa; flex-shrink: 0; margin-bottom: 10px;">← Back</button>` +
+                `<div style="flex: 1; ${scrollStyle} display: flex; flex-direction: column; gap: 15px;">` +
+                consumables.map(item =>
+                    `<button onclick="showTargetMenu('player', {type: 'item', id: '${item.id}'})">${item.name} x${item.count}</button>`
+                ).join('') +
+                `</div>`;
+            list.innerHTML = html;
+        }
+
+        function showTargetMenu(targetType, actionData, excludeDomId) {
+            state.battle.pendingAction = actionData;
+            const list = document.getElementById('command-list');
+            let targets;
+            
+            if (targetType === 'revive') {
+                targets = state.battle.combatants.filter(c => c.isPlayer && c.hp <= 0);
+            } else if (targetType === 'enemy') {
+                targets = state.battle.combatants.filter(c => !c.isPlayer && c.hp > 0);
+            } else {
+                targets = state.battle.combatants.filter(c => c.isPlayer && c.hp > 0);
+            }
+
+            if (excludeDomId) {
+                targets = targets.filter(c => c.domId !== excludeDomId);
+            }
+
+            let scrollStyle = targets.length >= 3 ? 'max-height: 150px; overflow-y: scroll;' : 'overflow-y: auto;';
+            let html = `<button onclick="renderCommandMenu()" style="color:#aaa; flex-shrink: 0; margin-bottom: 10px;">← Back</button>` +
+                `<div style="flex: 1; ${scrollStyle} display: flex; flex-direction: column; gap: 15px;">` +
+                targets.map(t =>
+                    `<button onclick="executeAction('${t.domId}')">${t.name} (HP: ${Math.max(0, t.hp)})</button>`
+                ).join('') +
+                `</div>`;
+            list.innerHTML = html;
+        }
+
+        function executeDefend() {
+            if (!state.battle.waiting) return;
+            let current = state.battle.combatants[state.battle.turnIndex];
+            current.isDefending = true;
+            
+            let manaRecovered = Math.floor(current.maxMp / 4);
+            current.mp = Math.min(current.maxMp, current.mp + manaRecovered);
+            
+            let logMsg = `${current.name} takes a defensive stance!`;
+            if (manaRecovered > 0) {
+                logMsg += `<br>Recovered ${manaRecovered} MP!`;
+            }
+            document.getElementById('battle-log').innerHTML = logMsg;
+            finishPlayerAction();
+        }
+
+        function executeAction(targetDomId) {
+            if (!state.battle.waiting) return;
+            
+            let action = state.battle.pendingAction;
+            
+            // If mic is enabled and it's a valid action to boost (Attack or Spell)
+            if (micEnabled && (action.type === 'attack' || action.type === 'spell')) {
+                startVolumeMeter(() => performActionLogic(targetDomId));
+            } else {
+                powerMultiplier = 1; // Default multiplier
+                maxRecordedDb = 0;
+                performActionLogic(targetDomId);
+            }
+        }
+
+        function performActionLogic(targetDomId) {
+            let current = state.battle.combatants[state.battle.turnIndex];
+            let target = targetDomId ? state.battle.combatants.find(c => c.domId === targetDomId) : null;
+            let action = state.battle.pendingAction;
+            let logMsg = "";
+            
+            let boostText = maxRecordedDb > 0 ? `<br><span style="color:#ffffaa;">(${maxRecordedDb}dB Boost: +${Math.floor((powerMultiplier - 1) * 100)}%!)</span>` : "";
+
+            if (action.type === 'attack') {
+                playAnimation(current.domId, 'anim-attack');
+                let baseDamage = Math.max(1, getStat(current, 'atk') - (target.isDefending ? getStat(target, 'def') * 2 : getStat(target, 'def')));
+                let finalDamage = Math.floor(baseDamage * powerMultiplier); 
+                
+                target.hp -= finalDamage;
+                let mpRestore = Math.floor(current.maxMp / 6);
+                current.mp = Math.min(current.maxMp, current.mp + mpRestore);
+                logMsg = `${current.name} attacks ${target.name} for ${finalDamage} DMG!${boostText}`;
+                playAnimation(target.domId, 'anim-damage');
+
+            } else if (action.type === 'spell') {
+                let spell = current.spells[action.index];
+                current.mp -= spell.cost;
+                playAnimation(current.domId, 'anim-attack');
+
+                if (spell.type === 'heal') {
+                    let baseHeal = Math.floor(getStat(current, 'mag') * spell.power);
+                    let finalHeal = Math.floor(baseHeal * powerMultiplier); 
+                    
+                    target.hp = Math.min(target.maxHp, target.hp + finalHeal);
+                    logMsg = `${current.name} casts ${spell.name}!<br>${target.name} recovers ${finalHeal} HP!${boostText}`;
+                    playAnimation(target.domId, 'anim-heal');
+                } else if (spell.type === 'damage') {
+                    let baseDamage = Math.max(1, Math.floor(getStat(current, 'mag') * spell.power) - getStat(target, 'mag'));
+                    let finalDamage = Math.floor(baseDamage * powerMultiplier); 
+                    
+                    target.hp -= finalDamage;
+                    logMsg = `${current.name} casts ${spell.name} on ${target.name} for ${finalDamage} DMG!${boostText}`;
+                    playAnima21tion(target.domId, 'anim-damage');
+                } else if (spell.type === 'debuff_spd') {
+                    let baseDrop = getStat(target, 'spd') * spell.power;
+                    let finalDrop = Math.floor(baseDrop * powerMultiplier); 
+                    let baseDamage = Math.max(1, Math.floor(getStat(current, 'mag') * spell.power) - getStat(target, 'mag'));
+                    let finalDamage = Math.floor(baseDamage * powerMultiplier); 
+                    
+                    target.hp -= finalDamage;
+                    target.spd = Math.max(1, target.spd - finalDrop); 
+                    logMsg = `${current.name} casts ${spell.name}!<br>${target.name}'s health dropped by ${finalDamage} and speed dropped by ${finalDrop}!${boostText}`;
+                    playAnimation(target.domId, 'anim-debuff');
+                } else if (spell.type === 'damage_all') {
+                    let baseDamage = Math.max(1, Math.floor(getStat(current, 'mag') * spell.power) - Math.floor(getStat(current, 'mag') * 0.5));
+                    let finalDamage = Math.floor(baseDamage * powerMultiplier);
+                    let damagedCount = 0;
+                    let totalDamage = 0;
+                    
+                    state.battle.combatants.forEach(c => {
+                        if (!c.isPlayer && c.hp > 0) {
+                            let enemyDefense = getStat(c, 'mag');
+                            let adjustedDamage = Math.max(1, finalDamage - enemyDefense);
+                            c.hp -= adjustedDamage;
+                            totalDamage += adjustedDamage;
+                            damagedCount++;
+                            playAnimation(c.domId, 'anim-damage');
+                            
+                            if(c.hp <= 0) {
+                                let enemyEl = document.getElementById(c.domId);
+                                if(enemyEl) enemyEl.style.opacity = '0.3';
+                            }
+                        }
+                    });
+                    
+                    logMsg = `${current.name} casts ${spell.name}!<br>All enemies take ${totalDamage} total damage! (${damagedCount} hit)${boostText}`;
+                } else if (spell.type === 'buff_team_def') {
+                    let baseBoost = Math.floor(getStat(current, 'mag') * spell.power);
+                    let finalBoost = Math.floor(baseBoost * powerMultiplier);
+                    let buffedCount = 0;
+                    
+                    state.battle.combatants.forEach(c => {
+                        if (c.isPlayer && c.hp > 0) {
+                            c.def = c.def + finalBoost;
+                            buffedCount++;
+                            playAnimation(c.domId, 'anim-heal');
+                        }
+                    });
+                    
+                    logMsg = `${current.name} casts ${spell.name}!<br>The party's defense increased by ${finalBoost}! (${buffedCount} members buffed)${boostText}`;
+                } else if (spell.type === 'buff_spd') {
+                    let baseBoost = Math.floor(getStat(current, 'mag') * spell.power);
+                    let finalBoost = Math.floor(baseBoost * powerMultiplier);
+                    
+                    target.spd = target.spd + finalBoost;
+                    logMsg = `${current.name} casts ${spell.name}!<br>${target.name}'s speed increased by ${finalBoost}!${boostText}`;
+                    playAnimation(target.domId, 'anim-heal');
+                } else if (spell.type === 'buff_spd_restore_mp') {
+                    let baseBoost = Math.floor(getStat(current, 'mag') * spell.power);
+                    let finalBoost = Math.floor(baseBoost * powerMultiplier);
+                    let mpRestore = Math.floor(target.maxMp / 2);
+                    
+                    target.spd = target.spd + finalBoost;
+                    target.mp = Math.min(target.maxMp, target.mp + mpRestore);
+                    logMsg = `${current.name} casts ${spell.name}!<br>${target.name}'s speed increased by ${finalBoost}!${boostText}`;
+                    playAnimation(target.domId, 'anim-heal');
+                } else if (spell.type === 'revive') {
+                    let baseHeal = Math.floor(getStat(current, 'mag') * spell.power);
+                    let finalHeal = Math.floor(baseHeal * powerMultiplier);
+                    
+                    target.hp = Math.min(target.maxHp, finalHeal);
+                    logMsg = `${current.name} casts ${spell.name}!<br>${target.name} is revived with ${finalHeal} HP!${boostText}`;
+                    playAnimation(target.domId, 'anim-heal');
+                }
+
+            } else if (action.type === 'item') {
+                let itemIndex = state.inventory.findIndex(i => i.id === action.id);
+                let item = state.inventory[itemIndex];
+                
+                if (item.id === 'pot_hp') {
+                    target.hp = Math.min(target.maxHp, target.hp + 100);
+                    logMsg = `${current.name} uses ${item.name}!<br>${target.name} recovers 100 HP!`;
+                    playAnimation(current.domId, 'anim-heal');
+                    playAnimation(target.domId, 'anim-heal');
+                } else if (item.id === 'pot_mp') {
+                    target.mp = Math.min(target.maxMp, target.mp + 100);
+                    logMsg = `${current.name} uses ${item.name}!<br>${target.name} recovers 100 MP!`;
+                    playAnimation(current.domId, 'anim-heal');
+                    playAnimation(target.domId, 'anim-heal');
+                }
+
+                item.count--;
+                if (item.count <= 0) state.inventory.splice(itemIndex, 1);
+            }
+
+            document.getElementById('battle-log').innerHTML = logMsg;
+            renderPartyStatus();
+
+            if(target && target.hp <= 0 && !target.isPlayer) {
+                let enemyEl = document.getElementById(target.domId);
+                if(enemyEl) enemyEl.style.opacity = '0.3';
+                document.getElementById('battle-log').innerHTML += `<br>${target.name} was defeated!`;
+                
+                // Reward items for defeating enemies
+                let healthPotions = Math.floor(Math.random() * 3) + 1; // 1-3 health potions
+                let manaPotions = Math.floor(Math.random() * 2) + 1; // 1-2 mana potions
+                
+                let hpPotInv = state.inventory.find(i => i.id === 'pot_hp');
+                if (hpPotInv) {
+                    hpPotInv.count += healthPotions;
+                } else {
+                    state.inventory.push({ id: 'pot_hp', name: 'Health Potion', type: 'consumable', desc: 'Restores 100 HP.', count: healthPotions });
+                }
+                
+                let manaPotInv = state.inventory.find(i => i.id === 'pot_mp');
+                if (manaPotInv) {
+                    manaPotInv.count += manaPotions;
+                } else {
+                    state.inventory.push({ id: 'pot_mp', name: 'Mana Potion', type: 'consumable', desc: 'Restores 100 MP.', count: manaPotions });
+                }
+                
+                document.getElementById('battle-log').innerHTML += `<br>Received ${healthPotions}x Health Potion and ${manaPotions}x Mana Potion!`;
+            }
+
+            finishPlayerAction();
+        }
+
+        function finishPlayerAction() {
+            document.getElementById('command-list').innerHTML = '';
+            state.battle.waiting = false;
+            state.battle.turnIndex++;
+            setTimeout(nextTurn, 1500);
+        }
+
+        function playAnimation(id, animClass) {
+            let el = document.getElementById(id);
+            if(!el) return;
+            el.classList.add(animClass);
+            setTimeout(() => el.classList.remove(animClass), 300);
+        }
+
+        function renderPartyStatus() {
+            const container = document.getElementById('status-container');
+            container.innerHTML = '';
+            
+            let currentCombatant = state.battle.combatants[state.battle.turnIndex];
+            
+            party.forEach(char => {
+                const row = document.createElement('div');
+                row.className = 'status-row';
+                if(char.hp <= 0) row.style.opacity = '0.5';
+                let isActive = currentCombatant && currentCombatant.id === char.id && currentCombatant.isPlayer;
+                let nameColor = isActive ? 'color: yellow;' : '';
+                row.innerHTML = `
+                    <div class="status-name" style="${nameColor}">${char.name}</div>
+                    <div class="status-hp">HP ${Math.max(0, char.hp)}/${char.maxHp}</div>
+                    <div class="status-mp">MP ${Math.max(0, char.mp).toString().padStart(3, ' ')}</div>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function renderPartySprites() {
+            const container = document.getElementById('party-container');
+            container.innerHTML = '';
+
+            party.forEach(char => {
+                const el = document.createElement('div');
+                el.className = 'party-sprite';
+                el.id = char.domId; 
+                if(char.hp <= 0) el.style.opacity = '0.3';
+                el.innerHTML = `
+                    <div style="text-align: right">
+                        <div style="color: #ccc">${char.role}</div>
+                    </div>
+                    <span class="emoji">${char.sprite}${char.icon}</span>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function fleeBattle(won = false) {
+            const log = document.getElementById('battle-log');
+            if(!won) log.innerHTML = `Got away safely!`;
+            
+            document.querySelectorAll('.sprite, .party-sprite').forEach(el => el.classList.remove('active-turn'));
+            document.getElementById('turn-indicator').innerText = "";
+            state.stepsSinceLastEncounter = 0; 
+            
+            setTimeout(() => {
+                state.scene = 'map';
+                document.getElementById('battle-scene').style.display = 'none';
+                document.getElementById('game-canvas').style.display = 'block';
+                document.getElementById('mobile-dpad').style.display = '';
+                playMusic('overworld');
+                resizeCanvas();
+                drawMap();
+            }, 1000);
+        }
+
+        // --- INPUT HANDLING ---
+        window.addEventListener('keydown', (e) => {
+            if (state.scene === 'map') {
+                switch(e.key) {
+                    case 'ArrowUp':
+                    case 'w':
+                    case 'W':
+                        movePlayer(0, -1); break;
+                    case 'ArrowDown':
+                    case 's':
+                    case 'S':
+                        movePlayer(0, 1); break;
+                    case 'ArrowLeft':
+                    case 'a':
+                    case 'A':
+                        movePlayer(-1, 0); break;
+                    case 'ArrowRight':
+                    case 'd':
+                    case 'D':
+                        movePlayer(1, 0); break;
+                }
+            }
+        });
+
+        // Touch swipe detection for mobile
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('touchstart', (e) => {
+            if (state.scene === 'map') {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+            }
+        });
+
+        document.addEventListener('touchend', (e) => {
+            if (state.scene === 'map') {
+                let touchEndX = e.changedTouches[0].clientX;
+                let touchEndY = e.changedTouches[0].clientY;
+                
+                let deltaX = touchEndX - touchStartX;
+                let deltaY = touchEndY - touchStartY;
+                
+                // Require a minimum swipe distance of 50px
+                let minSwipeDistance = 50;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Horizontal swipe
+                    if (Math.abs(deltaX) > minSwipeDistance) {
+                        if (deltaX > 0) {
+                            movePlayer(1, 0); // Swipe right
+                        } else {
+                            movePlayer(-1, 0); // Swipe left
+                        }
+                    }
+                } else {
+                    // Vertical swipe
+                    if (Math.abs(deltaY) > minSwipeDistance) {
+                        if (deltaY > 0) {
+                            movePlayer(0, 1); // Swipe down
+                        } else {
+                            movePlayer(0, -1); // Swipe up
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- RESPONSIVE CANVAS HANDLING ---
+        window.addEventListener('resize', () => {
+            if (state.scene === 'map') {
+                resizeCanvas();
+            }
+        });
+
+        // Initialize Game
+        resizeCanvas();
+        initMap();
+        playMusic('overworld');
+
+    </script>
+</div>
+</body>
+</html>

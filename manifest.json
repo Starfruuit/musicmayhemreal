@@ -1,0 +1,11 @@
+{
+  "name": "music mayhem",
+  "short_name": "music mayhem",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "background_color": "#ffbc5e",
+  "theme_color": "#ffe772",
+  "icon": [
+    {"src": "images/maskable_icon.png", "sizes": "192x192", "type": "image/png"}
+  ]
+}
